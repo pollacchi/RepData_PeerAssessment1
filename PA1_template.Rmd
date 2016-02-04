@@ -9,17 +9,107 @@ output:
 ## Loading and preprocessing the data
 
 
+```{r}
 
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
+library(ggplot2)
+mydata <- read.csv("C:/Users/user/reproducibleresearchassignment/activity.csv",header=TRUE,sep=",",colClasses=c("numeric", "character", "numeric"))
 
 
+mydata$date <- as.Date(mydata$date, format = "%Y-%m-%d")
+mydata$interval <- as.factor(mydata$interval)
 
-## Imputing missing values
 
+```
+
+##2. Total Number of Steps per Day
+```{r}
+
+dailysteps <- aggregate(steps ~ date, mydata, sum)
+
+ggplot(dailysteps, aes(x = steps)) + 
+       geom_histogram(fill = "green", binwidth = 500) + 
+        labs(title="Daily Steps", 
+             x = "Number of Steps per Day", y = "Number")
+```
+
+##3. What is mean total number of steps taken per day?
+
+```{r}
+mean_steps   <- mean(dailysteps$steps )
+median_steps <- median(dailysteps$steps)
+```
+
+
+## 4.time series of average steps taken
+```{r}
+intstep <- aggregate(mydata$steps, 
+                                by = list(interval = mydata$interval),
+                                FUN=mean, na.rm=TRUE)
+
+intstep$interval <- 
+        as.integer(levels(intstep$interval)[intstep$interval])
+colnames(intstep) <- c("interval", "steps")
+
+ggplot(intstep, aes(x=interval, y=steps)) +   
+        geom_line(color="yellow", size=1) +  
+        labs(title="Average Daily Steps", x="Interval", y="Number") +  
+        theme_bw()
+```
+
+```{r}
+max <- max(mydata$steps, na.rm = TRUE)
+```
+
+## 6.  missing values
+
+```{r}
+missing_vals <- sum(is.na(mydata$steps))
+```
+
+
+```{r}
+na_fill <- function(data, pervalue) {
+        na_index <- which(is.na(data$steps))
+        na_replace <- unlist(lapply(na_index, FUN=function(idx){
+                interval = data[idx,]$interval
+                pervalue[pervalue$interval == interval,]$steps
+        }))
+        fill_steps <- data$steps
+        fill_steps[na_index] <- na_replace
+        fill_steps
+}
+
+rdata_fill <- data.frame(  
+        steps = na_fill(mydata, intstep),  
+        date = mydata$date,  
+        interval = mydata$interval)
+str(rdata_fill)
+```
+
+
+```{r}
+sum(is.na(rdata_fill$steps))
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+daytype <- function(date) {
+    if (weekdays(as.Date(date)) %in% c("Saturday", "Sunday")) {
+        "weekend"
+    } else {
+        "weekday"
+    }
+}
+rdata_fill$daytype <- as.factor(sapply(rdata_fill$date, daytype))
+
+par(mfrow = c(2, 1))
+for (type in c("weekend", "weekday")) {
+    steps.type <- aggregate(steps ~ interval, data = rdata_fill, subset = rdata_fill$daytype == 
+        type, FUN = mean)
+    plot(steps.type, type = "l", main = type)
+}
+```
+
+
